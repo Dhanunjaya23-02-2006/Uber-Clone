@@ -1,6 +1,6 @@
 # Backend API: User Registration
 
-## `POST /users/register`
+## `/users/register Endpoint`
 
 Registers a user account and returns the created user together with an
 authentication token.
