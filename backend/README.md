@@ -245,3 +245,107 @@ The token is missing, invalid, expired, or blacklisted:
 ### Authentication
 
 Requires a valid jwt token in the authorization header or cookies
+
+## Captain Routes
+
+Captain routes are mounted at `/captains`.
+
+### `/captains/register`
+
+Registers a captain and their vehicle, then returns the created captain and an
+authentication token.
+
+#### Request body
+
+Send JSON with `Content-Type: application/json`:
+
+| Field | Type | Required | Requirements |
+| --- | --- | --- | --- |
+| `fullname` | Object | Yes | Captain's name. |
+| `fullname.firstname` | String | Yes | Must not be empty. |
+| `fullname.lastname` | String | No | If provided, at least 3 characters. |
+| `email` | String | Yes | Must be a valid email address. |
+| `password` | String | Yes | At least 6 characters. |
+| `vehicle` | Object | Yes | Captain's vehicle details. |
+| `vehicle.colour` | String | Yes | At least 3 characters. |
+| `vehicle.plate` | String | Yes | At least 3 characters. |
+| `vehicle.capacity` | Integer | Yes | At least 1. |
+| `vehicle.vehicleType` | String | Yes | One of `car`, `motorcycle`, or `auto`. |
+
+Example:
+
+```json
+{
+  "fullname": {
+    "firstname": "Alex",
+    "lastname": "Morgan"
+  },
+  "email": "captain@example.com",
+  "password": "secret123",
+  "vehicle": {
+    "colour": "blue",
+    "plate": "ABC123",
+    "capacity": 4,
+    "vehicleType": "car"
+  }
+}
+```
+
+#### Responses
+
+##### `201 Created`
+
+Registration succeeded. The response property is named `captian` by the
+current API:
+
+```json
+{
+  "captian": {
+    "_id": "66f1234567890abcdef12345",
+    "fullname": {
+      "firstname": "Alex",
+      "lastname": "Morgan"
+    },
+    "email": "captain@example.com",
+    "status": "inactive",
+    "vehicle": {
+      "colour": "blue",
+      "plate": "ABC123",
+      "capacity": 4,
+      "vehicleType": "car"
+    },
+    "__v": 0
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+The password is not included in the captain object.
+
+##### `400 Bad Request`
+
+The request failed validation, or a captain is already registered with the
+email address. Validation errors are returned as an `errors` array, for
+example:
+
+```json
+{
+  "errors": [
+    {
+      "type": "field",
+      "value": "not-an-email",
+      "msg": "Please provide a valid email address",
+      "path": "email",
+      "location": "body"
+    }
+  ]
+}
+```
+
+For a duplicate email, the response is:
+
+```json
+{
+  "message": "Captain with this email already exists"
+}
+```
