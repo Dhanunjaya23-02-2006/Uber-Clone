@@ -250,43 +250,29 @@ Requires a valid jwt token in the authorization header or cookies
 
 Captain routes are mounted at `/captains`.
 
-### `/captains/register`
+### `POST /captains/register`
 
 Registers a captain and their vehicle, then returns the created captain and an
 authentication token.
 
 #### Request body
 
-Send JSON with `Content-Type: application/json`:
+Send JSON with `Content-Type: application/json`. This JSONC example includes
+comments with field requirements and constraints:
 
-| Field | Type | Required | Requirements |
-| --- | --- | --- | --- |
-| `fullname` | Object | Yes | Captain's name. |
-| `fullname.firstname` | String | Yes | Must not be empty. |
-| `fullname.lastname` | String | No | If provided, at least 3 characters. |
-| `email` | String | Yes | Must be a valid email address. |
-| `password` | String | Yes | At least 6 characters. |
-| `vehicle` | Object | Yes | Captain's vehicle details. |
-| `vehicle.colour` | String | Yes | At least 3 characters. |
-| `vehicle.plate` | String | Yes | At least 3 characters. |
-| `vehicle.capacity` | Integer | Yes | At least 1. |
-| `vehicle.vehicleType` | String | Yes | One of `car`, `motorcycle`, or `auto`. |
-
-Example:
-
-```json
+```jsonc
 {
   "fullname": {
-    "firstname": "Alex",
-    "lastname": "Morgan"
+    "firstname": "Alex", // Required; non-empty and at least 3 characters per model.
+    "lastname": "Morgan" // Optional; if provided, at least 3 characters.
   },
-  "email": "captain@example.com",
-  "password": "secret123",
+  "email": "captain@example.com", // Required; valid and unique email address.
+  "password": "secret123", // Required; at least 6 characters.
   "vehicle": {
-    "colour": "blue",
-    "plate": "ABC123",
-    "capacity": 4,
-    "vehicleType": "car"
+    "colour": "blue", // Required; at least 3 characters.
+    "plate": "ABC123", // Required; at least 3 characters.
+    "capacity": 4, // Required integer; at least 1.
+    "vehicleType": "car" // Required; "car", "motorcycle", or "auto".
   }
 }
 ```
@@ -296,9 +282,9 @@ Example:
 ##### `201 Created`
 
 Registration succeeded. The response property is named `captian` by the
-current API:
+current API. The example is JSONC so comments can explain response fields:
 
-```json
+```jsonc
 {
   "captian": {
     "_id": "66f1234567890abcdef12345",
@@ -306,15 +292,15 @@ current API:
       "firstname": "Alex",
       "lastname": "Morgan"
     },
-    "email": "captain@example.com",
-    "status": "inactive",
+    "email": "captain@example.com", // Registered email; password is omitted.
+    "status": "inactive", // New captains default to inactive.
     "vehicle": {
       "colour": "blue",
       "plate": "ABC123",
       "capacity": 4,
       "vehicleType": "car"
     },
-    "__v": 0
+    "__v": 0 // Mongoose version key.
   },
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
@@ -347,5 +333,134 @@ For a duplicate email, the response is:
 ```json
 {
   "message": "Captain with this email already exists"
+}
+```
+
+### `POST /captains/login`
+
+Authenticates a captain and returns their profile with a JWT. The response
+property is currently spelled `captian`. A successful login also sets the
+`token` cookie.
+
+#### Request body
+
+Send JSON with `Content-Type: application/json`:
+
+```jsonc
+{
+  "email": "captain@example.com", // Required; must be a valid email address.
+  "password": "secret123" // Required; at least 6 characters.
+}
+```
+
+#### Responses
+
+##### `200 OK`
+
+```jsonc
+{
+  "captian": {
+    "_id": "66f1234567890abcdef12345",
+    "fullname": {
+      "firstname": "Alex",
+      "lastname": "Morgan"
+    },
+    "email": "captain@example.com",
+    "status": "inactive",
+    "vehicle": {
+      "colour": "blue",
+      "plate": "ABC123",
+      "capacity": 4,
+      "vehicleType": "car"
+    },
+    "__v": 0
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." // JWT expires in 24 hours.
+}
+```
+
+The password is excluded from the returned captain object.
+
+##### `400 Bad Request`
+
+Request validation failed. The response contains an `errors` array, as in the
+registration endpoint's validation response.
+
+##### `401 Unauthorized`
+
+The email does not match a registered captain or the password is incorrect:
+
+```jsonc
+{
+  "message": "Invalid email or password"
+}
+```
+
+### `GET /captains/profile`
+
+Returns the authenticated captain's profile. No request body is required.
+Authenticate with the JWT returned by registration or login, using either an
+`Authorization` Bearer token or the `token` cookie.
+
+#### Responses
+
+##### `200 OK`
+
+```jsonc
+{
+  "captian": {
+    "_id": "66f1234567890abcdef12345",
+    "fullname": {
+      "firstname": "Alex",
+      "lastname": "Morgan"
+    },
+    "email": "captain@example.com",
+    "status": "inactive",
+    "vehicle": {
+      "colour": "blue",
+      "plate": "ABC123",
+      "capacity": 4,
+      "vehicleType": "car"
+    },
+    "__v": 0
+  }
+}
+```
+
+The password is excluded from the profile response.
+
+##### `401 Unauthorized`
+
+The token is missing, invalid, expired, or blacklisted:
+
+```jsonc
+{
+  "message": "Unauthorized"
+}
+```
+
+### `GET /captains/logout`
+
+Logs out the authenticated captain by blacklisting the current token and
+clearing the `token` cookie. No request body is required; authenticate in the
+same way as the profile endpoint.
+
+#### Responses
+
+##### `200 OK`
+
+```jsonc
+{
+  "message": "Logout successfully"
+}
+```
+
+##### `401 Unauthorized`
+
+The token is missing, invalid, expired, or blacklisted:
+
+```jsonc
+{
+  "message": "Unauthorized"
 }
 ```
