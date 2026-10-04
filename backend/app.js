@@ -12,6 +12,7 @@ app.use(cookieParser());
 app.use("/users",userRoutes);
 app.use("/captains",captianRoutes);
 
+
 connectDB();
 
 app.get("/",(req,res)=> {
