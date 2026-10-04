@@ -1,7 +1,6 @@
 const dotenv=require('dotenv');
 dotenv.config();
 const express=require("express");
-const cors=require('cors')
 const app=express();
 const cookieParser=require("cookie-parser");
 const connectDB=require("./db/db")
@@ -14,8 +13,6 @@ app.use("/users",userRoutes);
 app.use("/captains",captianRoutes);
 
 connectDB();
-
-app.use(cors());
 
 app.get("/",(req,res)=> {
     res.send("Welcome to uber clone");
