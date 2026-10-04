@@ -20,8 +20,8 @@ const CaptianLogin = () => {
   };
 
   return (
-    <div className="p-7 h-screen flex flex-col justify-between">
-      <div>
+    <div className="flex min-h-dvh flex-col justify-between gap-8 px-5 py-6 sm:px-8 sm:py-8">
+      <div className="mx-auto w-full max-w-md">
         <img className="w-16 mb-10" src={"https://logos-world.net/wp-content/uploads/2020/05/Uber-Emblem.png"} alt="Uber" />
 
         <form onSubmit={submitHandler}>
@@ -71,7 +71,7 @@ const CaptianLogin = () => {
         </form>
       </div>
 
-      <div>
+      <div className="mx-auto w-full max-w-md">
         <Link to={'/login'}
           type="button"
           className="bg-[#3af] flex justify-center items-center text-white font-semibold mb-7 rounded px-4 py-2 w-full text-lg"

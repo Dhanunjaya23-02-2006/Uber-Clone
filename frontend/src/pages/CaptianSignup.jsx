@@ -28,8 +28,8 @@ const CaptianSignup = () => {
   }
 
   return (
-    <div className="p-7 h-screen flex flex-col justify-between">
-      <div>
+    <div className="flex min-h-dvh flex-col justify-between gap-8 px-5 py-6 sm:px-8 sm:py-8">
+      <div className="mx-auto w-full max-w-md">
         <img className="w-16 mb-10" src={"https://logos-world.net/wp-content/uploads/2020/05/Uber-Emblem.png"} alt="Uber" />
 
         <form onSubmit={(e) => {
@@ -37,11 +37,11 @@ const CaptianSignup = () => {
         }}>
           <h3 className="text-lg font-medium mb-2">What's our Captian's name</h3>
 
-          <div className="flex gap-4 mb-5">
+          <div className="mb-5 flex flex-col gap-3 min-[400px]:flex-row min-[400px]:gap-4">
             <input
               type="text"
               required
-              className="bg-[#eeeeee] w-1/2 rounded px-4 py-2 border  text-lg placeholder:text-base"
+              className="w-full min-w-0 rounded border bg-[#eeeeee] px-4 py-2 text-lg placeholder:text-base min-[400px]:w-1/2"
               placeholder="First Name"
               value={firstName}
               onChange={(e) => {
@@ -51,7 +51,7 @@ const CaptianSignup = () => {
             <input
               type="text"
               required
-              className="bg-[#eeeeee] w-1/2 rounded px-4 py-2 border  text-lg placeholder:text-base"
+              className="w-full min-w-0 rounded border bg-[#eeeeee] px-4 py-2 text-lg placeholder:text-base min-[400px]:w-1/2"
               placeholder="Last Name"
               value={lastName}
               onChange={(e) => {
@@ -105,7 +105,7 @@ const CaptianSignup = () => {
         </form>
       </div>
 
-      <div>
+      <div className="mx-auto w-full max-w-md">
         <p className="text-[10px] leading-tight">
           This site is protected by reCAPTCHA and the <span className="underline">Google Privacy
             Policy</span> and <span className="underline">Terms and Service apply.</span>

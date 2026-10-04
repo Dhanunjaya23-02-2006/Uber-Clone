@@ -21,8 +21,8 @@ const UserLogin = () => {
   };
 
   return (
-    <div className="p-7 h-screen flex flex-col justify-between">
-      <div>
+    <div className="flex min-h-dvh flex-col justify-between gap-8 px-5 py-6 sm:px-8 sm:py-8">
+      <div className="mx-auto w-full max-w-md">
         <img className="w-16 mb-10" src={logo} alt="Uber" />
 
         <form onSubmit={submitHandler}>
@@ -72,7 +72,7 @@ const UserLogin = () => {
         </form>
       </div>
 
-      <div>
+      <div className="mx-auto w-full max-w-md">
         <Link to={'/captain-login'}
           type="button"
           className="bg-[#88e] flex justify-center items-center text-white font-semibold mb-7 rounded px-4 py-2 w-full text-lg"
