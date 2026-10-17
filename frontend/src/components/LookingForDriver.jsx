@@ -1,4 +1,12 @@
 const LookingForDriver = (props) => {
+
+    const fareType = {
+    UberGo: "car",
+    Moto: "moto",
+    UberAuto: "auto"
+  }[props.vehicleType]
+  const fare = props.fare?.[fareType]
+
     return (
         <div>
             <h5 className="p-1 text-center w-[93%] top-0 absolute" onClick={() => {
@@ -12,20 +20,20 @@ const LookingForDriver = (props) => {
                         <i className="text-lg ri-map-pin-2-fill"></i>
                         <div>
                             <h3 className="text-mg font-medium">65-A/2,madhapur</h3>
-                            <p className="text-sm mt-1 text-gray-600">AyyapaSociety,Hyderabad</p>
+                            <p className="text-sm mt-1 text-gray-600">{props.pickup}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-5 p-3 border-b-2">
                         <i className="text-lg ri-map-pin-2-fill"></i>
                         <div>
                             <h3 className="text-mg font-medium">91,Road No:3,Siddiq Nagar</h3>
-                            <p className="text-sm mt-1 text-gray-600">Gachibowli,Hyderabad</p>
+                            <p className="text-sm mt-1 text-gray-600">{props.destination}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-5 p-3">
                         <i className="text-lg ri-currency-line"></i>
                         <div>
-                            <h3 className="text-mg font-medium">₹193.20</h3>
+                            <h3 className="text-mg font-medium">{fare != null ? `₹${fare}` : "—"}</h3>
                             <p className="text-sm mt-1 text-gray-600">Cash Cash</p>
                         </div>
                     </div>

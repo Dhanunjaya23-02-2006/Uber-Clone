@@ -1,4 +1,17 @@
-# Backend API: User Registration
+# Backend API Reference
+
+The API server listens on port `3000` by default. Routes are mounted under
+`/users`, `/captains`, `/maps`, and `/rides`. Authenticated endpoints accept a
+JWT in the `Authorization: Bearer <token>` header or in the `token` cookie.
+
+Configure the backend with a `.env` file containing `MONGODB_URI`, `JWT_SECRET`,
+and `OPENROUTESERVICE_API_KEY`. `PORT` and `FRONTEND_URL` are optional; they
+default to `3000` and `http://localhost:5173`, respectively. Start the server
+from the backend directory with `node server.js`.
+Set the frontend's `VITE_BASE_URL` to the backend URL (for example,
+`http://localhost:3000`) so the client can reach these routes.
+
+The root health/welcome route is `GET /` and returns `Welcome to uber clone`.
 
 ## `/users/register Endpoint`
 
@@ -438,6 +451,157 @@ The token is missing, invalid, expired, or blacklisted:
   "message": "Unauthorized"
 }
 ```
+
+## Map Routes
+
+All map routes are mounted at `/maps` and require an authenticated user token.
+The backend uses OpenRouteService for geocoding, autocomplete, and routing.
+
+### `GET /maps/get-suggestions`
+
+Returns up to five autocomplete address labels for the supplied search text.
+
+| Query parameter | Type | Required | Requirements |
+| --- | --- | --- | --- |
+| `input` | String | Yes | At least 3 characters after trimming. |
+
+Example request:
+
+```http
+GET /maps/get-suggestions?input=Hyderabad%20airport
+Authorization: Bearer <token>
+```
+
+The response is an array of strings:
+
+```json
+[
+  "Rajiv Gandhi International Airport, Hyderabad, Telangana, India"
+]
+```
+
+### `GET /maps/get-coordinates`
+
+Looks up the latitude and longitude for an address.
+
+| Query parameter | Type | Required | Requirements |
+| --- | --- | --- | --- |
+| `address` | String | Yes | At least 3 characters after trimming. |
+
+Example success response:
+
+```json
+{
+  "lat": 17.2403,
+  "lng": 78.4294
+}
+```
+
+### `GET /maps/get-distance-time`
+
+Returns driving distance and duration between two addresses. Both values in
+the response include a human-readable `text` value and a numeric `value`
+(distance in meters and duration in seconds).
+
+| Query parameter | Type | Required | Requirements |
+| --- | --- | --- | --- |
+| `origin` | String | Yes | At least 3 characters. |
+| `destination` | String | Yes | At least 3 characters. |
+
+Example success response:
+
+```json
+{
+  "distance": {
+    "text": "12.34 km",
+    "value": 12340
+  },
+  "duration": {
+    "text": "25 mins",
+    "value": 1500
+  }
+}
+```
+
+Map routes return `400 Bad Request` for invalid query parameters,
+`401 Unauthorized` for a missing, invalid, expired, or blacklisted token, and
+`502 Bad Gateway` when OpenRouteService is unavailable. Coordinate and
+distance lookups return `404 Not Found` when an address has no match.
+
+## Ride Routes
+
+### `GET /rides/get-fare`
+
+Calculates estimated fares for all supported vehicle types between a pickup
+and destination. This endpoint requires an authenticated user token.
+
+#### Query parameters
+
+| Parameter | Type | Required | Requirements |
+| --- | --- | --- | --- |
+| `pickup` | String | Yes | At least 3 characters. |
+| `destination` | String | Yes | At least 3 characters. |
+
+Example request:
+
+```http
+GET /rides/get-fare?pickup=Gachibowli%2C%20Hyderabad&destination=Rajiv%20Gandhi%20International%20Airport%2C%20Hyderabad
+Authorization: Bearer <token>
+```
+
+#### Responses
+
+`200 OK` returns an object with estimated fares keyed by vehicle type:
+
+```json
+{
+  "auto": 250,
+  "car": 380,
+  "moto": 190
+}
+```
+
+The fare is calculated using the route distance and duration returned by
+OpenRouteService, together with a vehicle-specific base fare, per-kilometer
+rate, and per-minute rate. Values are rounded to the nearest whole unit.
+
+`400 Bad Request` is returned when either query parameter is missing or
+shorter than 3 characters. `401 Unauthorized` is returned when the user token
+is missing or invalid. `500 Internal Server Error` is returned if fare
+calculation fails, such as when the mapping service cannot resolve the
+addresses or calculate a route.
+
+### `POST /rides/create`
+
+Creates a ride for the authenticated user. The fare is calculated from the
+pickup and destination addresses using the configured OpenRouteService API key.
+
+#### Request body
+
+| Field | Type | Required | Requirements |
+| --- | --- | --- | --- |
+| `pickup` | String | Yes | At least 3 characters. |
+| `destination` | String | Yes | At least 3 characters. |
+| `vehicleType` | String | Yes | One of `auto`, `car`, or `moto`. |
+
+Example:
+
+```json
+{
+  "pickup": "Gachibowli, Hyderabad",
+  "destination": "Rajiv Gandhi International Airport, Hyderabad",
+  "vehicleType": "car"
+}
+```
+
+#### Responses
+
+`201 Created` returns the created ride document, including its generated ID,
+pickup and destination, calculated fare, and initial `pending` status.
+
+`400 Bad Request` is returned when a request field fails validation.
+`401 Unauthorized` is returned when the user token is missing or invalid.
+`500 Internal Server Error` is returned when ride creation fails.
 
 ### `GET /captains/logout`
 

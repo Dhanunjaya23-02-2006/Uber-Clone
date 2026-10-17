@@ -2,11 +2,13 @@ import { useState } from 'react'
 
 const VehiclePanelMain = (props) => {
     const [selectedVehicle, setSelectedVehicle] = useState("UberGo")
+    const { fare } = props
 
     const handleVehicleSelect = (vehicle) => {
         setSelectedVehicle(vehicle)
         props.setVehiclePanel(false)
         props.setConfirmRidePanel(true)
+        props.selectVehicle(vehicle)
     }
 
     return (
@@ -22,7 +24,7 @@ const VehiclePanelMain = (props) => {
                     <h5 className="font-medium text-base">2 mins away</h5>
                     <p className="font-normal text-xs text-gray-600">Affordable,compact rides</p>
                 </div>
-                <h2 className="text-lg font-semibold">₹193.20</h2>
+                <h2 className="text-lg font-semibold">{fare?.car != null ? `₹${fare.car}` : "—"}</h2>
             </div>
             <div onClick={() => handleVehicleSelect("Moto")} className={`flex border-2 ${selectedVehicle === "Moto" ? "border-black" : "border-gray-100"} mb-2 rounded-xl w-full p-3 items-center justify-between`}>
                 <img className="h-11" src="https://cn-geo1.uber.com/image-proc/crop/resizecrop/udam/format=auto/width=956/height=538/srcb64=aHR0cHM6Ly90Yi1zdGF0aWMudWJlci5jb20vcHJvZC91ZGFtLWFzc2V0cy85MjAwMTg5YS03MWMwLTRmNmQtYTlkZS0xYjZhODUyMzkwNzkucG5n" alt="" />
@@ -31,7 +33,7 @@ const VehiclePanelMain = (props) => {
                     <h5 className="font-medium text-base">3 mins away</h5>
                     <p className="font-normal text-xs text-gray-600">Affordable,motocycle ride</p>
                 </div>
-                <h2 className="text-lg font-semibold">₹65.20</h2>
+                <h2 className="text-lg font-semibold">{fare?.moto != null ? `₹${fare.moto}` : "—"}</h2>
             </div>
             <div onClick={() => handleVehicleSelect("UberAuto")} className={`flex border-2 ${selectedVehicle === "UberAuto" ? "border-black" : "border-gray-100"} mb-2 rounded-xl w-full p-3 items-center justify-between`}>
                 <img className="h-11" src="https://clipart-library.com/2023/Uber_Auto_312x208_pixels_Mobile.png" alt="" />
@@ -40,7 +42,7 @@ const VehiclePanelMain = (props) => {
                     <h5 className="font-medium text-base">3 mins away</h5>
                     <p className="font-normal text-xs text-gray-600">Affordable,Auto ride</p>
                 </div>
-                <h2 className="text-lg font-semibold">₹118.36</h2>
+                <h2 className="text-lg font-semibold">{fare?.auto != null ? `₹${fare.auto}` : "—"}</h2>
             </div>
         </div>
     )

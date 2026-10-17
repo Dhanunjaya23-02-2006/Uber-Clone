@@ -21,11 +21,11 @@ const UserProtectedWrapper = ({ children }) => {
       },
     }).then((response) => {
       if (response.status === 200) {
-        setUser(response.data.captian);
+        setUser(response.data.user);
         setIsLoading(false);
       }
     }).catch((error) => {
-      console.error('Failed to load captain profile:', error);
+      console.error('Failed to load user profile:', error);
       localStorage.removeItem('token');
       navigate('/login');
     });
