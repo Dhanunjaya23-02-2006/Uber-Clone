@@ -6,7 +6,10 @@ JWT in the `Authorization: Bearer <token>` header or in the `token` cookie.
 
 Configure the backend with a `.env` file containing `MONGODB_URI`, `JWT_SECRET`,
 and `OPENROUTESERVICE_API_KEY`. `PORT` and `FRONTEND_URL` are optional; they
-default to `3000` and `http://localhost:5173`, respectively. Start the server
+default to `3000` and `http://localhost:5173`, respectively. Set `FRONTEND_URL`
+to the exact browser origin, or use comma-separated `FRONTEND_URLS` to allow
+multiple origins. In non-production environments, HTTPS origins under
+`*.devtunnels.ms` are also allowed for VS Code Dev Tunnels. Start the server
 from the backend directory with `node server.js`.
 Set the frontend's `VITE_BASE_URL` to the backend URL (for example,
 `http://localhost:3000`) so the client can reach these routes.

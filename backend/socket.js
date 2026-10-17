@@ -1,4 +1,5 @@
 const { Server } = require("socket.io");
+const corsConfig = require("./cors.config");
 const userModel = require("./models/user");
 const captainModel = require("./models/captian.model");
 
@@ -6,10 +7,7 @@ let io;
 
 function initializeSocket(server) {
   io = new Server(server, {
-    cors: {
-      origin: process.env.FRONTEND_URL || "http://localhost:5173",
-      credentials: true,
-    },
+    cors: corsConfig,
   });
 
   io.on("connection", (socket) => {
