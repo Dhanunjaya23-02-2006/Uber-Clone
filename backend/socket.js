@@ -47,21 +47,39 @@ function initializeSocket(server) {
 
     socket.on('update-location-captain',async(data)=> {
       const { userId, location } = data || {};
-      const { ltd, lng } = location || {};
+      const { lat, ltd, lng } = location || {};
+      const latitude = ltd ?? lat;
 
       if (
         !userId ||
-        !Number.isFinite(ltd) || ltd < -90 || ltd > 90 ||
+        !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
         !Number.isFinite(lng) || lng < -180 || lng > 180
       ) {
         socket.emit("location:error", { message: "A valid userId and location coordinates are required" });
         return;
       }
 
-      await captainModel.findByIdAndUpdate(userId, { location: {
-        ltd : location.ltd,
-        lng: location.lng
-      } })
+      try {
+        const captain = await captainModel.findByIdAndUpdate(userId, {
+          $set: {
+            "location.ltd": latitude,
+            "location.lng": lng,
+          },
+        });
+
+        if (!captain) {
+          socket.emit("location:error", { message: "Captain not found" });
+          return;
+        }
+
+        socket.emit("location:updated", {
+          userId,
+          location: { ltd: latitude, lng },
+        });
+      } catch (error) {
+        console.error("Failed to update captain location:", error);
+        socket.emit("location:error", { message: "Could not update captain location" });
+      }
     });
 
     socket.on("disconnect", () => {

@@ -246,7 +246,7 @@ module.exports.getCaptainsInTheRadius = async (lat, lng, radius) => {
   const minLatitude = Math.max(-90, latitude - latitudeDelta);
   const maxLatitude = Math.min(90, latitude + latitudeDelta);
   const query = {
-    "location.lat": { $gte: minLatitude, $lte: maxLatitude },
+    "location.ltd": { $gte: minLatitude, $lte: maxLatitude },
   };
 
   const longitudeDelta =
@@ -260,24 +260,24 @@ module.exports.getCaptainsInTheRadius = async (lat, lng, radius) => {
 
     if (minLongitude < -180) {
       query.$or = [
-        { "location.long": { $gte: minLongitude + 360 } },
-        { "location.long": { $lte: maxLongitude } },
+        { "location.lng": { $gte: minLongitude + 360 } },
+        { "location.lng": { $lte: maxLongitude } },
       ];
     } else if (maxLongitude > 180) {
       query.$or = [
-        { "location.long": { $gte: minLongitude } },
-        { "location.long": { $lte: maxLongitude - 360 } },
+        { "location.lng": { $gte: minLongitude } },
+        { "location.lng": { $lte: maxLongitude - 360 } },
       ];
     } else {
-      query["location.long"] = { $gte: minLongitude, $lte: maxLongitude };
+      query["location.lng"] = { $gte: minLongitude, $lte: maxLongitude };
     }
   }
 
   const captains = await captainModel.find(
     query,
     {
-      "location.lat": 1,
-      "location.long": 1,
+      "location.ltd": 1,
+      "location.lng": 1,
       fullname: 1,
       socketId: 1,
       vehicle: 1,
@@ -288,8 +288,8 @@ module.exports.getCaptainsInTheRadius = async (lat, lng, radius) => {
   const toRadians = (degrees) => (degrees * Math.PI) / 180;
 
   return captains.filter((captain) => {
-    const captainLat = captain.location.lat;
-    const captainLng = captain.location.long;
+    const captainLat = captain.location.ltd;
+    const captainLng = captain.location.lng;
     const latitudeDifference = toRadians(captainLat - latitude);
     const longitudeDifference = toRadians(captainLng - longitude);
     const haversine = Math.min(
