@@ -1,742 +1,140 @@
-# Backend API Reference
+# Backend
 
-The API server listens on port `3000` by default. Routes are mounted under
-`/users`, `/captains`, `/maps`, and `/rides`. Authenticated endpoints accept a
-JWT in the `Authorization: Bearer <token>` header or in the `token` cookie.
+Express REST API and Socket.IO server for the Uber Clone rider and captain applications. The server uses MongoDB for accounts, rides, and token revocation, and OpenRouteService for address and route lookups.
 
-Configure the backend with a `.env` file containing `MONGODB_URI`, `JWT_SECRET`,
-and `OPENROUTESERVICE_API_KEY`. `PORT` and `FRONTEND_URL` are optional; they
-default to `3000` and `http://localhost:5173`, respectively. Set `FRONTEND_URL`
-to the exact browser origin, or use comma-separated `FRONTEND_URLS` to allow
-multiple origins. In non-production environments, HTTPS origins under
-`*.devtunnels.ms` are also allowed for VS Code Dev Tunnels. Start the server
-from the backend directory with `node server.js`.
-Set the frontend's `VITE_BASE_URL` to the backend URL (for example,
-`http://localhost:3000`) so the client can reach these routes.
+## Requirements
 
-The root health/welcome route is `GET /` and returns `Welcome to uber clone`.
+- Node.js and npm.
+- A reachable MongoDB instance.
+- An OpenRouteService API key.
 
-## `/users/register Endpoint`
+## Setup
 
-Registers a user account and returns the created user together with an
-authentication token.
+Create `backend/.env`:
 
-### Request body
-
-Send a JSON object with the following fields:
-
-| Field | Type | Required | Requirements |
-| --- | --- | --- | --- |
-| `fullname` | Object | Yes | Must contain `firstname`; `lastname` is optional. |
-| `fullname.firstname` | String | Yes | At least 3 characters. |
-| `fullname.lastname` | String | No | If provided, at least 3 characters. |
-| `email` | String | Yes | Must be a valid email address. |
-| `password` | String | Yes | At least 6 characters. |
-
-Example:
-
-```json
-{
-  "fullname": {
-    "firstname": "Alex",
-    "lastname": "Morgan"
-  },
-  "email": "alex@example.com",
-  "password": "secret123"
-}
+```dotenv
+PORT=3000
+MONGODB_URI=mongodb://127.0.0.1:27017/uber-clone
+JWT_SECRET=replace-with-a-long-random-secret
+OPENROUTESERVICE_API_KEY=your-openrouteservice-api-key
+FRONTEND_URL=http://localhost:5173
 ```
 
-Send the body with the `Content-Type: application/json` header.
+`PORT` is optional and defaults to `3000`. `FRONTEND_URL` defaults to `http://localhost:5173`; `FRONTEND_URLS` can be used to allow additional comma-separated origins. In non-production environments, HTTPS `*.devtunnels.ms` origins are also allowed. Do not commit `.env` or real credentials.
 
-### Responses
+Install and run from this directory:
 
-#### `201 Created`
-
-Registration succeeded. The response contains the created user and an
-authentication token. For example:
-
-```json
-{
-  "user": {
-    "fullname": {
-      "firstname": "Alex",
-      "lastname": "Morgan"
-    },
-    "email": "alex@example.com",
-    "password": "$2b$10$exampleHashedPasswordValue",
-    "_id": "66f1234567890abcdef12345",
-    "__v": 0
-  },
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
+```powershell
+npm install
+node server.js
 ```
 
-The `user` object in the success response has this structure:
+The HTTP API and Socket.IO server share the same port. `GET /` returns `Welcome to uber clone`. MongoDB must be available before using API features.
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `user` | Object | Yes | The newly registered user. |
-| `user.fullname` | Object | Yes | Contains the user's name. |
-| `user.fullname.firstname` | String | Yes | The user's first name. |
-| `user.fullname.lastname` | String | No | The user's last name, if provided. |
-| `user.email` | String | Yes | The user's email address. |
-| `user.password` | String | Yes | The stored password hash; the plain-text password is not returned. |
-| `user._id` | String | Yes | MongoDB identifier for the user. |
-| `user.__v` | Number | Yes | Mongoose version key. |
-| `token` | String | Yes | Authentication token for the user. |
+## Authentication
 
-#### `400 Bad Request`
-
-One or more request fields failed validation. The response contains the
-validation errors. For example, an invalid email produces a response like:
-
-```json
-{
-  "errors": [
-    {
-      "type": "field",
-      "value": "not-an-email",
-      "msg": "Invalid email",
-      "path": "email",
-      "location": "body"
-    }
-  ]
-}
-```
-
-## `/users/login` Endpoint
-
-Authenticates an existing user and returns the user record together with an
-authentication token.
-
-### Request body
-
-Send a JSON object with these fields:
-
-| Field | Type | Required | Requirements |
-| --- | --- | --- | --- |
-| `email` | String | Yes | Must be a valid email address. |
-| `password` | String | Yes | At least 6 characters. |
-
-Example:
-
-```json
-{
-  "email": "alex@example.com",
-  "password": "secret123"
-}
-```
-
-Send the body with the `Content-Type: application/json` header.
-
-### Responses
-
-#### `200 OK`
-
-Login succeeded. The response includes the user and an authentication token.
-The password value shown is the stored hash, not the submitted password:
-
-```json
-{
-  "user": {
-    "fullname": {
-      "firstname": "Alex",
-      "lastname": "Morgan"
-    },
-    "email": "alex@example.com",
-    "password": "$2b$10$exampleHashedPasswordValue",
-    "_id": "66f1234567890abcdef12345",
-    "__v": 0
-  },
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-#### `400 Bad Request`
-
-The email or password failed request validation. The response includes the
-validation errors, for example:
-
-```json
-{
-  "errors": [
-    {
-      "type": "field",
-      "value": "not-an-email",
-      "msg": "Invalid email",
-      "path": "email",
-      "location": "body"
-    }
-  ]
-}
-```
-
-#### `401 Unauthorized`
-
-No user exists with that email, or the password does not match:
-
-```json
-{
-  "message": "Invalid email or password"
-}
-```
-
-## `/users/profile` Endpoint
-
-Returns the authenticated user's profile.
-
-### Request
-
-Send a `GET` request with the token returned by `/users/login`. Authenticate
-using a Bearer token in the `Authorization` header, or send the `token` cookie
-set by login. In Postman, choose **Bearer Token** in the **Authorization** tab
-and paste the login response's `token` value. No request body is required.
-
-### Responses
-
-#### `200 OK`
-
-The authenticated user's profile is returned:
-
-```json
-{
-  "user": {
-    "fullname": {
-      "firstname": "Alex",
-      "lastname": "Morgan"
-    },
-    "email": "alex@example.com",
-    "_id": "66f1234567890abcdef12345",
-    "__v": 0
-  }
-}
-```
-
-The password is excluded from this response.
-
-#### `401 Unauthorized`
-
-The token is missing, invalid, expired, or blacklisted:
-
-```json
-{
-  "message": "Unauthorized"
-}
-```
-
-## `/users/logout` Endpoint
-
-Logs out the authenticated user, adds the current token to the token blacklist,
-and clears the `token` cookie.
-
-### Request
-
-Send a `GET` request authenticated with the login token, either as a Bearer
-token in the `Authorization` header or as the `token` cookie. In Postman,
-choose **Bearer Token** in the **Authorization** tab and paste the login
-response's `token` value. No request body is required.
-
-### Responses
-
-#### `200 OK`
-
-The user was logged out:
-
-```json
-{
-  "message": "Logged out successfully"
-}
-```
-
-#### `401 Unauthorized`
-
-The token is missing, invalid, expired, or blacklisted:
-
-```json
-{
-  "message": "Unauthorized"
-}
-```
-
-### Authentication
-
-Requires a valid jwt token in the authorization header or cookies
-
-## Captain Routes
-
-Captain routes are mounted at `/captains`.
-
-### `POST /captains/register`
-
-Registers a captain and their vehicle, then returns the created captain and an
-authentication token.
-
-#### Request body
-
-Send JSON with `Content-Type: application/json`. This JSONC example includes
-comments with field requirements and constraints:
-
-```jsonc
-{
-  "fullname": {
-    "firstname": "Alex", // Required; non-empty and at least 3 characters per model.
-    "lastname": "Morgan" // Optional; if provided, at least 3 characters.
-  },
-  "email": "captain@example.com", // Required; valid and unique email address.
-  "password": "secret123", // Required; at least 6 characters.
-  "vehicle": {
-    "colour": "blue", // Required; at least 3 characters.
-    "plate": "ABC123", // Required; at least 3 characters.
-    "capacity": 4, // Required integer; at least 1.
-    "vehicleType": "car" // Required; "car", "motorcycle", or "auto".
-  }
-}
-```
-
-#### Responses
-
-##### `201 Created`
-
-Registration succeeded. The response property is named `captian` by the
-current API. The example is JSONC so comments can explain response fields:
-
-```jsonc
-{
-  "captian": {
-    "_id": "66f1234567890abcdef12345",
-    "fullname": {
-      "firstname": "Alex",
-      "lastname": "Morgan"
-    },
-    "email": "captain@example.com", // Registered email; password is omitted.
-    "status": "inactive", // New captains default to inactive.
-    "vehicle": {
-      "colour": "blue",
-      "plate": "ABC123",
-      "capacity": 4,
-      "vehicleType": "car"
-    },
-    "__v": 0 // Mongoose version key.
-  },
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-The password is not included in the captain object.
-
-##### `400 Bad Request`
-
-The request failed validation, or a captain is already registered with the
-email address. Validation errors are returned as an `errors` array, for
-example:
-
-```json
-{
-  "errors": [
-    {
-      "type": "field",
-      "value": "not-an-email",
-      "msg": "Please provide a valid email address",
-      "path": "email",
-      "location": "body"
-    }
-  ]
-}
-```
-
-For a duplicate email, the response is:
-
-```json
-{
-  "message": "Captain with this email already exists"
-}
-```
-
-### `POST /captains/login`
-
-Authenticates a captain and returns their profile with a JWT. The response
-property is currently spelled `captian`. A successful login also sets the
-`token` cookie.
-
-#### Request body
-
-Send JSON with `Content-Type: application/json`:
-
-```jsonc
-{
-  "email": "captain@example.com", // Required; must be a valid email address.
-  "password": "secret123" // Required; at least 6 characters.
-}
-```
-
-#### Responses
-
-##### `200 OK`
-
-```jsonc
-{
-  "captian": {
-    "_id": "66f1234567890abcdef12345",
-    "fullname": {
-      "firstname": "Alex",
-      "lastname": "Morgan"
-    },
-    "email": "captain@example.com",
-    "status": "inactive",
-    "vehicle": {
-      "colour": "blue",
-      "plate": "ABC123",
-      "capacity": 4,
-      "vehicleType": "car"
-    },
-    "__v": 0
-  },
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." // JWT expires in 24 hours.
-}
-```
-
-The password is excluded from the returned captain object.
-
-##### `400 Bad Request`
-
-Request validation failed. The response contains an `errors` array, as in the
-registration endpoint's validation response.
-
-##### `401 Unauthorized`
-
-The email does not match a registered captain or the password is incorrect:
-
-```jsonc
-{
-  "message": "Invalid email or password"
-}
-```
-
-### `GET /captains/profile`
-
-Returns the authenticated captain's profile. No request body is required.
-Authenticate with the JWT returned by registration or login, using either an
-`Authorization` Bearer token or the `token` cookie.
-
-#### Responses
-
-##### `200 OK`
-
-```jsonc
-{
-  "captian": {
-    "_id": "66f1234567890abcdef12345",
-    "fullname": {
-      "firstname": "Alex",
-      "lastname": "Morgan"
-    },
-    "email": "captain@example.com",
-    "status": "inactive",
-    "vehicle": {
-      "colour": "blue",
-      "plate": "ABC123",
-      "capacity": 4,
-      "vehicleType": "car"
-    },
-    "__v": 0
-  }
-}
-```
-
-The password is excluded from the profile response.
-
-### `GET /captains/stats`
-
-Returns the authenticated captain's total completed-ride earnings, cumulative
-online time in seconds, completed ride count, and current online status. Online
-time is tracked while the captain is online and sharing location; dashboard
-values refresh while the captain home is open.
-
-Example response:
-
-```json
-{
-  "totalEarnings": 295.2,
-  "completedRides": 1,
-  "onlineSeconds": 3672,
-  "isOnline": true
-}
-```
-
-### `PATCH /captains/profile-image`
-
-Saves or removes the authenticated captain's profile photo. Submit a
-JPEG data URL in `profileImage` (maximum decoded size 700 KB), or `null` to
-restore the default profile icon. The captain app resizes selected images
-before saving them.
-
-```json
-{
-  "profileImage": "data:image/jpeg;base64,..."
-}
-```
-
-##### `401 Unauthorized`
-
-The token is missing, invalid, expired, or blacklisted:
-
-```jsonc
-{
-  "message": "Unauthorized"
-}
-```
-
-## Map Routes
-
-All map routes are mounted at `/maps` and require an authenticated user token.
-The backend uses OpenRouteService for geocoding, autocomplete, and routing.
-
-### `GET /maps/get-suggestions`
-
-Returns up to five autocomplete address labels for the supplied search text.
-
-| Query parameter | Type | Required | Requirements |
-| --- | --- | --- | --- |
-| `input` | String | Yes | At least 3 characters after trimming. |
-
-Example request:
+Protected REST endpoints accept the JWT returned by registration or login. Send it as a bearer token:
 
 ```http
-GET /maps/get-suggestions?input=Hyderabad%20airport
 Authorization: Bearer <token>
 ```
 
-The response is an array of strings:
+The API also accepts a `token` cookie. Tokens expire after 24 hours. Logout blacklists the current token; an expired, missing, invalid, or blacklisted token receives `401 Unauthorized`.
 
-```json
-[
-  "Rajiv Gandhi International Airport, Hyderabad, Telangana, India"
-]
-```
+Requests with JSON bodies should use `Content-Type: application/json`. Validation failures generally return `400` with an `errors` array; other failures may return a JSON `message`.
 
-### `GET /maps/get-coordinates`
+## REST API
 
-Looks up the latitude and longitude for an address.
+The route paths below are relative to the server origin, for example `http://localhost:3000`.
 
-| Query parameter | Type | Required | Requirements |
-| --- | --- | --- | --- |
-| `address` | String | Yes | At least 3 characters after trimming. |
+### Users
 
-Example success response:
+| Method and path | Auth | Purpose and inputs |
+| --- | --- | --- |
+| `POST /users/register` | No | Register with `fullname.firstname` (minimum 3 chars), optional `fullname.lastname` (minimum 3 if supplied), valid `email`, and `password` (minimum 6 chars). Returns `201` with `user` and `token`. |
+| `POST /users/login` | No | Authenticate with `email` and `password`. Returns `user` and `token`; also sets the `token` cookie. Invalid credentials return `401`. |
+| `GET /users/profile` | User | Return the authenticated user's profile. |
+| `GET /users/logout` | User | Blacklist the current token and clear the token cookie. |
 
-```json
-{
-  "lat": 17.2403,
-  "lng": 78.4294
-}
-```
+### Captains
 
-### `GET /maps/get-distance-time`
+| Method and path | Auth | Purpose and inputs |
+| --- | --- | --- |
+| `POST /captains/register` | No | Register with `fullname.firstname`, optional `fullname.lastname`, valid `email`, `password` (minimum 6 chars), and `vehicle` (`colour`, `plate`, `capacity`, `vehicleType`). Vehicle type is `car`, `motorcycle`, or `auto`. Returns `201` with `captian` (the response key is spelled this way) and `token`. |
+| `POST /captains/login` | No | Authenticate with `email` and `password`. Returns `captian` and `token`; also sets the `token` cookie. Invalid credentials return `401`. |
+| `GET /captains/profile` | Captain | Return the authenticated captain profile. |
+| `GET /captains/stats` | Captain | Return completed rides, total earnings, online seconds, and online status. |
+| `PATCH /captains/profile-image` | Captain | Set `profileImage` to a JPEG data URL (maximum 700 KB decoded) or `null` to remove it. |
+| `PATCH /captains/payment-details` | Captain | Set `upiId` to a valid UPI ID, such as `name@bank`. |
+| `GET /captains/logout` | Captain | Blacklist the current token, clear the cookie, and mark the captain offline. |
 
-Returns driving distance and duration between two addresses. Both values in
-the response include a human-readable `text` value and a numeric `value`
-(distance in meters and duration in seconds).
+### Maps
 
-| Query parameter | Type | Required | Requirements |
-| --- | --- | --- | --- |
-| `origin` | String | Yes | At least 3 characters. |
-| `destination` | String | Yes | At least 3 characters. |
+All map routes require an authenticated **user** token.
 
-Example success response:
+| Method and path | Query parameters | Purpose |
+| --- | --- | --- |
+| `GET /maps/get-suggestions` | `input` (minimum 3 trimmed characters) | Return address suggestions from OpenRouteService. |
+| `GET /maps/get-coordinates` | `address` (minimum 3 trimmed characters) | Resolve an address to `{ "lat": number, "lng": number }`. |
+| `GET /maps/get-distance-time` | `origin`, `destination` (each minimum 3 chars) | Return distance and duration with human-readable `text` and numeric `value` (meters and seconds). |
 
-```json
-{
-  "distance": {
-    "text": "12.34 km",
-    "value": 12340
-  },
-  "duration": {
-    "text": "25 mins",
-    "value": 1500
-  }
-}
-```
+### Rides
 
-Map routes return `400 Bad Request` for invalid query parameters,
-`401 Unauthorized` for a missing, invalid, expired, or blacklisted token, and
-`502 Bad Gateway` when OpenRouteService is unavailable. Coordinate and
-distance lookups return `404 Not Found` when an address has no match.
+| Method and path | Auth | Inputs and purpose |
+| --- | --- | --- |
+| `GET /rides/get-fare` | User | Query `pickup` and `destination` to estimate fares for `auto`, `car`, and `moto`. |
+| `POST /rides/create` | User | JSON body: `pickup`, `destination`, and `vehicleType` (`auto`, `car`, or `moto`). Creates a pending ride and returns its OTP to the rider. |
+| `POST /rides/:rideId/accept` | Captain | Accept a pending request while online and sharing a location. |
+| `POST /rides/:rideId/start` | Captain | JSON body: `{ "otp": "123456" }`. Starts the assigned ride after OTP verification. |
+| `POST /rides/:rideId/complete` | Captain | JSON body: `{ "amountCollected": 100, "paymentMethod": "cash" }`; `paymentMethod` is `cash` or `upi`. Captain confirms receipt before completion. |
+| `POST /rides/:rideId/cancel` | User | Cancel a pending or accepted ride. An ongoing ride cannot be cancelled through this route. |
+| `PATCH /rides/:rideId/payment-method` | User | JSON body: `{ "paymentMethod": "cash" }` or `{ "paymentMethod": "upi" }` for an ongoing ride. |
+| `GET /rides/active/user` | User | Return the rider's active ride, or `{ "ride": null }`. |
+| `GET /rides/active/captain` | Captain | Return the captain's accepted or ongoing ride, or `{ "ride": null }`. |
 
-## Ride Routes
+Fare estimates are calculated using the route distance and duration and fixed rates in the backend. A rider may have only one pending, accepted, or ongoing ride at a time. Pending rides are offered to available captains within 2 km of the pickup; captains with an accepted or ongoing ride are not offered additional requests.
 
-### `GET /rides/get-fare`
+### Typical ride sequence
 
-Calculates estimated fares for all supported vehicle types between a pickup
-and destination. This endpoint requires an authenticated user token.
+1. Rider requests an estimate and creates a ride.
+2. Backend notifies nearby online captains; the ride stays pending if none are available.
+3. A captain accepts, and the rider receives the captain assignment.
+4. The rider shares the ride OTP; the captain submits it to start the trip.
+5. During the ride, captain location is shared with the rider.
+6. Rider selects cash or UPI; the captain confirms payment receipt and completes the trip.
 
-#### Query parameters
+UPI is a manual QR flow. The application does not automatically verify payments with a payment processor.
 
-| Parameter | Type | Required | Requirements |
-| --- | --- | --- | --- |
-| `pickup` | String | Yes | At least 3 characters. |
-| `destination` | String | Yes | At least 3 characters. |
+## Socket.IO
 
-Example request:
+Connect to the same origin and port as the REST API. The client uses `withCredentials: true`.
 
-```http
-GET /rides/get-fare?pickup=Gachibowli%2C%20Hyderabad&destination=Rajiv%20Gandhi%20International%20Airport%2C%20Hyderabad
-Authorization: Bearer <token>
-```
+### Client to server
 
-#### Responses
+| Event | Data | Purpose |
+| --- | --- | --- |
+| `join` | `{ "userId": "<account id>", "userType": "user" \| "captain" }` | Associate the socket connection with an account. |
+| `captain-availability` | `{ "userId": "<captain id>", "isOnline": true \| false }` | Set captain availability. A captain is dispatchable only after a valid location update. |
+| `update-location-captain` | `{ "userId": "<captain id>", "location": { "lat": number, "lng": number } }` | Share the captain's current coordinates. |
+| `location-unavailable` | `{ "userId": "<captain id>" }` | Tell the server that location sharing is unavailable. |
 
-`200 OK` returns an object with estimated fares keyed by vehicle type:
+### Server to client
 
-```json
-{
-  "auto": 250,
-  "car": 380,
-  "moto": 190
-}
-```
+| Event | Purpose |
+| --- | --- |
+| `join:success`, `join:error` | Report whether the account was associated with the socket. |
+| `availability:updated`, `availability:error` | Report captain availability state or an error. |
+| `location:updated`, `location:error` | Report location processing result. |
+| `new-ride` | Notify a nearby captain about a pending request. The ride OTP is not included. |
+| `ride-confirmed` | Notify a rider that a captain accepted their ride. |
+| `ride-started` | Notify a rider that their ride has started. |
+| `captain-location` | Send the assigned captain's location to the rider during a ride. |
+| `ride-cancelled` | Notify an assigned captain when the rider cancels. |
+| `ride-completed` | Notify the rider that the captain completed the ride and recorded payment. |
 
-The fare is calculated using the route distance and duration returned by
-OpenRouteService, together with a vehicle-specific base fare, per-kilometer
-rate, and per-minute rate. Values are rounded to the nearest whole unit.
+## Implementation notes
 
-`400 Bad Request` is returned when either query parameter is missing or
-shorter than 3 characters. `401 Unauthorized` is returned when the user token
-is missing or invalid. `500 Internal Server Error` is returned if fare
-calculation fails, such as when the mapping service cannot resolve the
-addresses or calculate a route.
-
-### `POST /rides/create`
-
-Creates a ride for the authenticated user. The fare is calculated from the
-pickup and destination addresses using the configured OpenRouteService API key.
-
-#### Request body
-
-| Field | Type | Required | Requirements |
-| --- | --- | --- | --- |
-| `pickup` | String | Yes | At least 3 characters. |
-| `destination` | String | Yes | At least 3 characters. |
-| `vehicleType` | String | Yes | One of `auto`, `car`, or `moto`. |
-
-Example:
-
-```json
-{
-  "pickup": "Gachibowli, Hyderabad",
-  "destination": "Rajiv Gandhi International Airport, Hyderabad",
-  "vehicleType": "car"
-}
-```
-
-#### Responses
-
-`201 Created` returns the created ride document, including its generated ID,
-pickup and destination, calculated fare, and initial `pending` status. Its OTP
-is returned only in this authenticated rider response. It is never included in
-the `new-ride` socket event sent to captains. The backend emits that event to
-logged-in captains who have shared a location within 2 km of the pickup. If no
-captain is nearby at request time, the ride remains pending and the rider sees
-a driver-searching state. When a captain next shares a location within 2 km,
-the pending ride is sent to that captain.
-
-`400 Bad Request` is returned when a request field fails validation.
-`401 Unauthorized` is returned when the user token is missing or invalid.
-`404 Not Found` is returned when the pickup cannot be geocoded. `409 Conflict`
-is returned when the rider already has an active ride. `502 Bad Gateway` is
-returned when the location service cannot complete the search.
-
-### `POST /rides/:rideId/accept`
-
-Accepts a pending ride for the authenticated captain. The captain must be
-connected and have shared a valid location. A successful acceptance returns
-the ride with captain name, vehicle, and location details, and emits a
-`ride-confirmed` socket event to the rider.
-
-`409 Conflict` is returned if the captain is not online with location sharing
-enabled or another captain has already accepted the ride. The ride OTP is not
-included in the response.
-
-### `POST /rides/:rideId/start`
-
-Starts an accepted ride after the assigned captain enters the 6-digit OTP
-provided by the rider.
-
-```json
-{
-  "otp": "123456"
-}
-```
-
-The OTP must match the ride assigned to the authenticated captain. A successful
-response includes the ride's `ongoing` status and does not include the OTP.
-`400 Bad Request` is returned for an invalid OTP or an invalid ride state.
-
-### Active ride and completion endpoints
-
-`GET /rides/active/user` returns the authenticated rider's pending, accepted,
-or ongoing ride, including the OTP for that rider only and the assigned
-captain's public profile once assigned. `GET /rides/active/captain` returns the
-authenticated captain's accepted or ongoing ride, without the rider's OTP.
-Both endpoints return `{ "ride": null }` when there is no active ride.
-
-Captain availability is controlled from the captain home screen over the
-Socket.IO `captain-availability` event. A captain becomes `active` only after
-enabling online mode and sharing a valid location; choosing offline changes the
-stored status to `inactive` and stops ride dispatch to that captain. Location
-updates keep the rider informed during an active ride, and busy captains are
-not offered additional rides.
-
-`POST /rides/:rideId/complete` marks an ongoing ride completed for its assigned
-captain after the captain confirms receipt of payment. The accepted payment
-methods are cash and manual UPI QR. The captain must confirm receipt; the QR is
-not automatically verified by a payment gateway. Cash requires the captain to
-enter the exact ride fare. Payment method, amount, and paid status are saved
-with the ride. The rider receives a `ride-completed` socket event with the
-payment details when connected.
-While a ride is accepted or ongoing, captain location updates are forwarded to
-the rider as `captain-location` socket events. Ride start is sent to the rider
-as `ride-started`.
-
-`POST /rides/:rideId/cancel` allows the authenticated rider to cancel their
-pending and accepted ride requests. This also clears any older outstanding
-requests, so they cannot be restored as active rides later. Assigned captains
-are notified with `ride-cancelled`. Rides that have started cannot be
-cancelled through this endpoint. A rider with an active ride cannot create
-another request until the existing ride is cancelled or completed.
-
-`PATCH /rides/:rideId/payment-method` lets the rider select `cash` or `upi`
-for an ongoing ride. UPI is available only after the captain saves a valid UPI
-ID in captain details. The captain is notified of the selected payment method.
-For UPI, the QR shown on the captain's finish screen requests the exact ride
-fare; the rider scans it in a payment app, and the captain verifies receipt
-manually before marking the ride paid.
-
-`PATCH /captains/payment-details` saves the authenticated captain's UPI ID for
-receiving manual UPI QR payments. The UPI ID is included only in the assigned
-ride's captain details.
-
-### `GET /captains/logout`
-
-Logs out the authenticated captain by blacklisting the current token and
-clearing the `token` cookie. No request body is required; authenticate in the
-same way as the profile endpoint.
-
-#### Responses
-
-##### `200 OK`
-
-```jsonc
-{
-  "message": "Logout successfully"
-}
-```
-
-##### `401 Unauthorized`
-
-The token is missing, invalid, expired, or blacklisted:
-
-```jsonc
-{
-  "message": "Unauthorized"
-}
-```
+- Main entry points: `server.js` creates the HTTP server; `app.js` configures Express, middleware, and REST routes; `socket.js` configures live events.
+- API groups are implemented in `routes/`, with request handling in `controllers/` and database operations in `services/`.
+- Mongoose models are in `models/`. Passwords are hashed and JWTs are signed with `JWT_SECRET`.
+- The backend package does not currently define a test script.

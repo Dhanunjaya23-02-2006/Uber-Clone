@@ -1,16 +1,79 @@
-# React + Vite
+# Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React single-page application for the Uber Clone rider and captain workflows. It uses Vite for development and production builds, React Router for navigation, Axios for API calls, and Socket.IO for live ride updates.
 
-Currently, two official plugins are available:
+## Requirements and setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Install a supported Node.js release and npm, then configure the API base URL. Create `frontend/.env`:
 
-## React Compiler
+```dotenv
+VITE_BASE_URL=http://localhost:3000
+VITE_API_URL=http://localhost:3000
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+From this directory, install dependencies and run the development server:
 
-## Expanding the ESLint configuration
+```powershell
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Open the local URL printed by Vite (normally `http://localhost:5173`). The backend must be running and configured with the matching frontend origin. For full-stack setup and backend configuration, see the [project README](../README.md) and [backend README](../backend/README.md).
+
+Vite exposes `VITE_*` variables to browser code. Set both variables to the backend origin without a trailing path, and restart the development server after changing `.env`. API requests use `VITE_BASE_URL`; the rider logout page currently reads `VITE_API_URL`.
+
+## Application routes
+
+| Route | Experience |
+| --- | --- |
+| `/` | Welcome screen with rider and captain entry points |
+| `/login`, `/signup` | Rider login and registration |
+| `/home` | Protected rider home: address search, fare selection, ride request, and cancellation |
+| `/riding` | Protected rider trip status, captain details, payment selection, and trip tracking |
+| `/captain-login`, `/captain-signup` | Captain login and registration, including vehicle details |
+| `/captain-home` | Protected captain dashboard: availability, nearby ride requests, profile settings, and stats |
+| `/captain-riding` | Protected captain trip workflow, OTP entry, and trip completion |
+| `/user/logout`, `/captain/logout` | Rider and captain logout flows |
+
+Protected routes verify the stored token against the backend profile endpoint and redirect unauthenticated users to the relevant login screen.
+
+## Ride workflow
+
+### Rider
+
+1. Register or sign in.
+2. Search for pickup and destination addresses.
+3. Review fare estimates and choose a vehicle.
+4. Request a ride and share the generated OTP with the assigned captain at pickup.
+5. Follow ride updates, select cash or UPI during an active trip, or cancel before the ride starts.
+
+### Captain
+
+1. Register with a vehicle, then sign in.
+2. Allow browser location access and switch to online to receive nearby requests.
+3. Review and accept a ride offer.
+4. Enter the rider's OTP to start the ride.
+5. Confirm cash or manual UPI payment receipt and complete the ride.
+
+Captains can also update their profile image and UPI ID and view ride and online-time statistics. UPI payments are manually confirmed; no payment gateway is integrated.
+
+## Development scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start Vite with hot module replacement |
+| `npm run build` | Build the production bundle into `dist/` |
+| `npm run preview` | Serve the production bundle locally |
+| `npm run lint` | Run ESLint |
+
+## Source layout
+
+```text
+src/
+  components/  Ride panels, dialogs, captain details, and other shared UI
+  context/     User, captain, and Socket.IO React contexts
+  pages/       Route-level rider and captain screens
+  assets/      Images and static assets imported by the client
+  App.jsx      Application route definitions
+  main.jsx     React bootstrap and context providers
+```
