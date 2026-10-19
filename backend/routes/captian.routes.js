@@ -22,6 +22,17 @@ router.post('/login', [
 
 
 router.get('/profile', authMiddleware.authCaptain, captianController.getCaptianProfile);
+router.get('/stats', authMiddleware.authCaptain, captianController.getCaptainStats);
+router.patch('/profile-image', authMiddleware.authCaptain, captianController.updateProfileImage);
+
+router.patch('/payment-details',
+    authMiddleware.authCaptain,
+    body('upiId')
+        .trim()
+        .matches(/^[\w.-]{2,256}@[A-Za-z]{2,64}$/)
+        .withMessage('Enter a valid UPI ID, such as name@bank'),
+    captianController.updatePaymentDetails
+);
 
 router.get('/logout',authMiddleware.authCaptain, captianController.logoutCaptian)
 

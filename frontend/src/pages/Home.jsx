@@ -12,6 +12,7 @@ import WaitingForDriver from "../components/WaitingForDriver";
 import SocketContext from "../context/SocketContext";
 import { useContext } from "react";
 import { UserDataContext } from "../context/UserContext";
+import { useNavigate } from "react-router-dom";
 
 const vehicleTypeMap = {
   UberGo: "car",
@@ -34,22 +35,72 @@ const Home = () => {
   const confirmRidePanelRef = useRef(null)
   const vehicleFoundRef = useRef(null)
   const waitingForDriverRef = useRef(null)
+  const riderOtpRef = useRef("")
+  const acceptedRideRef = useRef(null)
   const [confirmRidePanel, setConfirmRidePanel] = useState(false)
   const [vehiclePanel, setVehiclePanel] = useState(false)
   const [vehicleFound, setVehicleFound] = useState(false);
   const [waitingForDriver, setWaitingForDriver] = useState(false)
   const [fare, setFare] = useState(null)
   const [fareError, setFareError] = useState("")
+  const [rideError, setRideError] = useState("")
+  const [requestedRide, setRequestedRide] = useState(null)
+  const [matchedRide, setMatchedRide] = useState(null)
   const [vehicleType, setVehicleType] = useState(null);
 
-  const { sendMessage } = useContext(SocketContext)
+  const { sendMessage, receiveMessage } = useContext(SocketContext)
   const { user } = useContext(UserDataContext)
+  const navigate = useNavigate()
 
   useEffect(() => {
-    if (user?._id) {
+    if (!user?._id) return
+    const registerUser = () => {
       sendMessage("join", { userType: "user", userId: user._id })
     }
-  }, [sendMessage, user?._id])
+    const unsubscribeConnect = receiveMessage("connect", registerUser)
+    registerUser()
+    return unsubscribeConnect
+  }, [sendMessage, receiveMessage, user?._id])
+
+  useEffect(() => {
+    if (!user?._id) return
+
+    let isMounted = true
+    const loadActiveRide = async () => {
+      try {
+        const token = localStorage.getItem("token")
+        const response = await axios.get(
+          `${import.meta.env.VITE_BASE_URL || "http://localhost:3000"}/rides/active/user`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        if (!isMounted || !response.data.ride) return
+
+        const activeRide = response.data.ride
+        riderOtpRef.current = activeRide.otp || ""
+        setMatchedRide(activeRide)
+        navigate("/riding", { replace: true, state: { ride: activeRide } })
+      } catch (error) {
+        console.error("Could not restore active ride:", error.response?.data || error)
+      }
+    }
+
+    loadActiveRide()
+    return () => { isMounted = false }
+  }, [navigate, user?._id])
+
+  useEffect(() => {
+    return receiveMessage("ride-confirmed", ({ ride }) => {
+      console.info("Captain accepted ride:", ride)
+      acceptedRideRef.current = ride
+      if (riderOtpRef.current) {
+        const riderRide = { ...ride, otp: riderOtpRef.current }
+        setMatchedRide(riderRide)
+        setVehicleFound(false)
+        setWaitingForDriver(true)
+        navigate("/riding", { state: { ride: riderRide } })
+      }
+    })
+  }, [navigate, receiveMessage])
 
   const searchQuery = activeField === "pickup"
     ? pickUp
@@ -246,6 +297,9 @@ const Home = () => {
   }
 
   async function createRide() {
+    setRideError("")
+    riderOtpRef.current = ""
+    acceptedRideRef.current = null
     try {
       const response = await axios.post(`${import.meta.env.VITE_BASE_URL}/rides/create`, {
         pickup: pickUp,
@@ -258,10 +312,46 @@ const Home = () => {
           }
         })
 
-      console.log("Ride created:", response.data)
-      return true
+      console.info("Ride request created:", response.data._id)
+      setRequestedRide(response.data)
+      riderOtpRef.current = response.data.otp
+      if (acceptedRideRef.current?._id === response.data._id) {
+        const riderRide = { ...acceptedRideRef.current, otp: response.data.otp }
+        setMatchedRide(riderRide)
+        navigate("/riding", { state: { ride: riderRide } })
+      }
+      return response.data
     } catch (error) {
       console.error("Failed to create ride:", error.response?.data || error.message)
+      setRideError(
+        error.response?.data?.message ||
+        "Could not send the ride request. Please try again."
+      )
+      return null
+    }
+  }
+
+  async function cancelRide() {
+    if (!requestedRide?._id) return false
+
+    setRideError("")
+    try {
+      const token = localStorage.getItem("token")
+      await axios.post(
+        `${import.meta.env.VITE_BASE_URL || "http://localhost:3000"}/rides/${requestedRide._id}/cancel`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setRequestedRide(null)
+      setVehicleFound(false)
+      setWaitingForDriver(false)
+      setRideError("")
+      return true
+    } catch (error) {
+      console.error("Could not cancel ride:", error.response?.data || error)
+      setRideError(
+        error.response?.data?.message || "Could not cancel this ride. Please try again."
+      )
       return false
     }
   }
@@ -333,6 +423,7 @@ const Home = () => {
       <div ref={confirmRidePanelRef} className="fixed w-full z-10 bottom-0 translate-y-full px-3 py-6 bg-white pt-12">
         <ConfirmedRide
           createRide={createRide}
+          error={rideError}
           pickup={pickUp}
           destination={destination}
           fare={fare}
@@ -341,7 +432,9 @@ const Home = () => {
       </div>
       <div ref={vehicleFoundRef} className="fixed w-full z-10 bottom-0 translate-y-full px-3 py-6 bg-white pt-12">
         <LookingForDriver
-          createRide={createRide}
+          ride={requestedRide}
+          onCancelRide={cancelRide}
+          error={rideError}
           pickup={pickUp}
           destination={destination}
           fare={fare}
@@ -349,7 +442,7 @@ const Home = () => {
           setVehicleFound={setVehicleFound} setWaitingForDriver={setWaitingForDriver} />
       </div>
       <div ref={waitingForDriverRef} className="fixed w-full z-10 bottom-0 translate-y-full px-3 py-6 bg-white pt-12">
-        <WaitingForDriver setWaitingForDriver={setWaitingForDriver} />
+        <WaitingForDriver ride={matchedRide} setWaitingForDriver={setWaitingForDriver} />
       </div>
     </div>
   )

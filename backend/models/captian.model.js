@@ -21,6 +21,15 @@ const captainSchema = new mongoose.Schema({
         lowercase: true,
         match: [ /^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please fill a valid email address' ]
     },
+    upiId: {
+        type: String,
+        trim: true,
+        match: [ /^[\w.-]{2,256}@[A-Za-z]{2,64}$/, 'Please enter a valid UPI ID' ]
+    },
+    profileImage: {
+        type: String,
+        maxlength: 1000000
+    },
     password : {
         type: String,
         required: true,
@@ -33,6 +42,14 @@ const captainSchema = new mongoose.Schema({
         type: String,
         enum: ['active', 'inactive'],
         default: 'inactive'
+    },
+    onlineSince: {
+        type: Date
+    },
+    totalOnlineSeconds: {
+        type: Number,
+        min: 0,
+        default: 0
     },
     vehicle : {
         colour : {

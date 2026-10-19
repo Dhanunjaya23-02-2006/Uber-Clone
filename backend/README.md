@@ -445,6 +445,37 @@ Authenticate with the JWT returned by registration or login, using either an
 
 The password is excluded from the profile response.
 
+### `GET /captains/stats`
+
+Returns the authenticated captain's total completed-ride earnings, cumulative
+online time in seconds, completed ride count, and current online status. Online
+time is tracked while the captain is online and sharing location; dashboard
+values refresh while the captain home is open.
+
+Example response:
+
+```json
+{
+  "totalEarnings": 295.2,
+  "completedRides": 1,
+  "onlineSeconds": 3672,
+  "isOnline": true
+}
+```
+
+### `PATCH /captains/profile-image`
+
+Saves or removes the authenticated captain's profile photo. Submit a
+JPEG data URL in `profileImage` (maximum decoded size 700 KB), or `null` to
+restore the default profile icon. The captain app resizes selected images
+before saving them.
+
+```json
+{
+  "profileImage": "data:image/jpeg;base64,..."
+}
+```
+
 ##### `401 Unauthorized`
 
 The token is missing, invalid, expired, or blacklisted:
@@ -600,11 +631,89 @@ Example:
 #### Responses
 
 `201 Created` returns the created ride document, including its generated ID,
-pickup and destination, calculated fare, and initial `pending` status.
+pickup and destination, calculated fare, and initial `pending` status. Its OTP
+is returned only in this authenticated rider response. It is never included in
+the `new-ride` socket event sent to captains. The backend emits that event to
+logged-in captains who have shared a location within 2 km of the pickup. If no
+captain is nearby at request time, the ride remains pending and the rider sees
+a driver-searching state. When a captain next shares a location within 2 km,
+the pending ride is sent to that captain.
 
 `400 Bad Request` is returned when a request field fails validation.
 `401 Unauthorized` is returned when the user token is missing or invalid.
-`500 Internal Server Error` is returned when ride creation fails.
+`404 Not Found` is returned when the pickup cannot be geocoded. `409 Conflict`
+is returned when the rider already has an active ride. `502 Bad Gateway` is
+returned when the location service cannot complete the search.
+
+### `POST /rides/:rideId/accept`
+
+Accepts a pending ride for the authenticated captain. The captain must be
+connected and have shared a valid location. A successful acceptance returns
+the ride with captain name, vehicle, and location details, and emits a
+`ride-confirmed` socket event to the rider.
+
+`409 Conflict` is returned if the captain is not online with location sharing
+enabled or another captain has already accepted the ride. The ride OTP is not
+included in the response.
+
+### `POST /rides/:rideId/start`
+
+Starts an accepted ride after the assigned captain enters the 6-digit OTP
+provided by the rider.
+
+```json
+{
+  "otp": "123456"
+}
+```
+
+The OTP must match the ride assigned to the authenticated captain. A successful
+response includes the ride's `ongoing` status and does not include the OTP.
+`400 Bad Request` is returned for an invalid OTP or an invalid ride state.
+
+### Active ride and completion endpoints
+
+`GET /rides/active/user` returns the authenticated rider's pending, accepted,
+or ongoing ride, including the OTP for that rider only and the assigned
+captain's public profile once assigned. `GET /rides/active/captain` returns the
+authenticated captain's accepted or ongoing ride, without the rider's OTP.
+Both endpoints return `{ "ride": null }` when there is no active ride.
+
+Captain availability is controlled from the captain home screen over the
+Socket.IO `captain-availability` event. A captain becomes `active` only after
+enabling online mode and sharing a valid location; choosing offline changes the
+stored status to `inactive` and stops ride dispatch to that captain. Location
+updates keep the rider informed during an active ride, and busy captains are
+not offered additional rides.
+
+`POST /rides/:rideId/complete` marks an ongoing ride completed for its assigned
+captain after the captain confirms receipt of payment. The accepted payment
+methods are cash and manual UPI QR. The captain must confirm receipt; the QR is
+not automatically verified by a payment gateway. Cash requires the captain to
+enter the exact ride fare. Payment method, amount, and paid status are saved
+with the ride. The rider receives a `ride-completed` socket event with the
+payment details when connected.
+While a ride is accepted or ongoing, captain location updates are forwarded to
+the rider as `captain-location` socket events. Ride start is sent to the rider
+as `ride-started`.
+
+`POST /rides/:rideId/cancel` allows the authenticated rider to cancel their
+pending and accepted ride requests. This also clears any older outstanding
+requests, so they cannot be restored as active rides later. Assigned captains
+are notified with `ride-cancelled`. Rides that have started cannot be
+cancelled through this endpoint. A rider with an active ride cannot create
+another request until the existing ride is cancelled or completed.
+
+`PATCH /rides/:rideId/payment-method` lets the rider select `cash` or `upi`
+for an ongoing ride. UPI is available only after the captain saves a valid UPI
+ID in captain details. The captain is notified of the selected payment method.
+For UPI, the QR shown on the captain's finish screen requests the exact ride
+fare; the rider scans it in a payment app, and the captain verifies receipt
+manually before marking the ride paid.
+
+`PATCH /captains/payment-details` saves the authenticated captain's UPI ID for
+receiving manual UPI QR payments. The UPI ID is included only in the assigned
+ride's captain details.
 
 ### `GET /captains/logout`
 

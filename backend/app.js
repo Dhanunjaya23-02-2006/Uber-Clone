@@ -12,7 +12,7 @@ const mapsRoutes = require("./routes/maps.routes")
 const rideRoutes = require("./routes/ride.routes")
 
 app.use(cors(corsConfig));
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use("/users",userRoutes);
 app.use("/captains",captianRoutes);

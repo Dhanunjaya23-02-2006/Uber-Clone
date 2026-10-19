@@ -45,18 +45,20 @@ function getOtp(num){
 }
 
 module.exports.createRide = async ({
-    user,pickup,destination,vehicleType
+    user,pickup,destination,vehicleType,pickupLocation
 }) => {
-    if(!user || !pickup || !destination || !vehicleType) {
+    if(!user || !pickup || !destination || !vehicleType || !pickupLocation) {
         throw new Error('All fields are required')
     }
 
     const fare = await getFare(pickup, destination)
 
-    const ride = rideModel.create({
+    const ride = await rideModel.create({
         user,
         pickup,
         destination,
+        vehicleType,
+        pickupLocation,
         otp: getOtp(6),
         fare: fare[ vehicleType ]
     })

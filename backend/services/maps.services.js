@@ -223,26 +223,34 @@ module.exports.getAutoCompleteSuggestion = async (input) => {
   }
 };
 
-module.exports.getCaptainsInTheRadius = async (lat, lng, radius) => {
+module.exports.getCaptainsInTheRadius = async (lat, lng, radiusInKm) => {
+  const hasValue = (value) =>
+    value !== null &&
+    value !== undefined &&
+    !(typeof value === "string" && !value.trim());
+
   const latitude = Number(lat);
   const longitude = Number(lng);
-  const radiusInKm = Number(radius);
+  const searchRadiusInKm = Number(radiusInKm);
 
   if (
+    !hasValue(lat) ||
     !Number.isFinite(latitude) ||
     latitude < -90 ||
     latitude > 90 ||
+    !hasValue(lng) ||
     !Number.isFinite(longitude) ||
     longitude < -180 ||
     longitude > 180 ||
-    !Number.isFinite(radiusInKm) ||
-    radiusInKm < 0
+    !hasValue(radiusInKm) ||
+    !Number.isFinite(searchRadiusInKm) ||
+    searchRadiusInKm < 0
   ) {
     throw new Error("Latitude, longitude, and a non-negative radius in kilometers are required");
   }
 
   const earthRadiusInKm = 6371;
-  const latitudeDelta = (radiusInKm / earthRadiusInKm) * (180 / Math.PI);
+  const latitudeDelta = (searchRadiusInKm / earthRadiusInKm) * (180 / Math.PI);
   const minLatitude = Math.max(-90, latitude - latitudeDelta);
   const maxLatitude = Math.min(90, latitude + latitudeDelta);
   const query = {
@@ -276,9 +284,11 @@ module.exports.getCaptainsInTheRadius = async (lat, lng, radius) => {
   const captains = await captainModel.find(
     query,
     {
+      _id: 1,
       "location.ltd": 1,
       "location.lng": 1,
       fullname: 1,
+      email: 1,
       socketId: 1,
       vehicle: 1,
       status: 1,
@@ -302,6 +312,6 @@ module.exports.getCaptainsInTheRadius = async (lat, lng, radius) => {
     const distanceInKm =
       2 * earthRadiusInKm * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 
-    return distanceInKm <= radiusInKm;
+    return distanceInKm <= searchRadiusInKm;
   });
 };

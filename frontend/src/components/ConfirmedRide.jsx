@@ -1,10 +1,26 @@
+import { useState } from "react"
+
 const ConfirmedRide = (props) => {
+  const [isCreatingRide, setIsCreatingRide] = useState(false)
   const fareType = {
     UberGo: "car",
     Moto: "moto",
     UberAuto: "auto"
   }[props.vehicleType]
   const fare = props.fare?.[fareType]
+
+  const confirmRide = async () => {
+    setIsCreatingRide(true)
+    try {
+      const ride = await props.createRide()
+      if (ride) {
+        props.setVehicleFound(true)
+        props.setConfirmRidePanel(false)
+      }
+    } finally {
+      setIsCreatingRide(false)
+    }
+  }
 
   return (
     <div>
@@ -38,10 +54,11 @@ const ConfirmedRide = (props) => {
           </div>
         </div>
         <button onClick={()=>{
-          props.setVehicleFound(true)
-          props.setConfirmRidePanel(false)
-          props.createRide()
-        }} className="w-full mt-5 bg-green-600 text-white font-semibold p-2 rounded-lg">Confirm</button>
+          confirmRide()
+        }} disabled={isCreatingRide} className="w-full mt-5 bg-green-600 disabled:opacity-50 text-white font-semibold p-2 rounded-lg">
+          {isCreatingRide ? "Sending request…" : "Confirm"}
+        </button>
+        {props.error && <p role="alert" className="mt-3 text-sm text-red-600">{props.error}</p>}
       </div>
     </div>
   )
